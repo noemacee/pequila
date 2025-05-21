@@ -22,20 +22,18 @@ class CircuitManager {
   }
 
   async verifyProof(proofVerify, publicInputs) {
-    try {
+    if (!this.backend) {
+      throw new Error('Circuit not initialized');
+    }
 
-      // Convert proof to Uint8Array if it's not already
+    try {
       const proofParsed = Array.isArray(proofVerify) 
         ? Uint8Array.from(proofVerify)
         : Uint8Array.from(JSON.parse(proofVerify));
 
-      // Ensure publicInputs is an array
       const publicInputsParsed = Array.isArray(publicInputs)
         ? publicInputs
         : JSON.parse(publicInputs);
-
-      console.log('Parsed proof length:', proofParsed.length);
-      console.log('Parsed public inputs:', publicInputsParsed);
 
       return await this.backend.verifyProof({
         proof: proofParsed,

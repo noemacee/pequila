@@ -8,6 +8,13 @@ export default defineConfig({
     port: 4173,
     fs: {
       allow: ['..']
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+        secure: false
+      }
     }
   },
   
@@ -28,6 +35,9 @@ export default defineConfig({
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true
-    }
+    },
+    outDir: 'dist',
+    assetsDir: 'assets',
+    emptyOutDir: true
   }
 }) 

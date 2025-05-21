@@ -8,14 +8,13 @@ class SessionManager {
   }
 
   // Create a new session after successful proof verification
-  createSession(userData) {
+  createSession() {
     // Generate a random session token
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = Date.now() + this.SESSION_DURATION;
 
     // Store session data
     this.sessions.set(sessionToken, {
-      userData,
       expiresAt,
       createdAt: Date.now()
     });
@@ -30,18 +29,11 @@ class SessionManager {
   validateSession(sessionToken) {
     const session = this.sessions.get(sessionToken);
     
-    if (!session) {
-      return null;
-    }
-
-    // Check if session has expired
-    if (Date.now() > session.expiresAt) {
+    if (!session || Date.now() > session.expiresAt) {
       this.sessions.delete(sessionToken);
       return null;
     }
 
-    // Refresh session expiration
-    session.expiresAt = Date.now() + this.SESSION_DURATION;
     return session;
   }
 

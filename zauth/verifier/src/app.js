@@ -1,10 +1,10 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const path = require('path');
 const config = require('./config');
 const circuitManager = require('./circuit');
 const verifyRoutes = require('./routes/verify');
-const merkleRoutes = require('./routes/merkle');
 
 const app = express();
 
@@ -13,9 +13,16 @@ app.use(cors());
 app.use(bodyParser.json({ limit: config.bodyParserLimit }));
 app.use(bodyParser.urlencoded({ limit: config.bodyParserLimit, extended: true }));
 
-// Routes
+// API Routes
 app.use('/api', verifyRoutes);
-app.use('/api/merkle', merkleRoutes);
+
+// Serve static files from the client build directory
+app.use(express.static(path.join(__dirname, '../../client/dist')));
+
+// For any other route, serve the index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
+});
 
 // Initialize server
 async function startServer() {
@@ -30,4 +37,6 @@ async function startServer() {
   }
 }
 
-startServer(); 
+startServer();
+
+module.exports = app; 
