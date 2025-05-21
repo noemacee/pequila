@@ -1,0 +1,6 @@
+# build artifacts
+/target/
+
+# local prover/verifier configs
+Prover.toml
+Verifier.toml
