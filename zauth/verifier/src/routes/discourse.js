@@ -58,7 +58,7 @@ function createSSOResponse(nonce) {
 
 // Initial SSO request from Discourse
 router.get('/sso', (req, res) => {
-  console.log('Received SSO request');
+  console.log('=== SSO Request Received ===');
   console.log('Query parameters:', req.query);
   
   const { sso, sig } = req.query;
@@ -79,19 +79,24 @@ router.get('/sso', (req, res) => {
     const { nonce, return_sso_url } = decodeSSOPayload(sso);
     console.log('Decoded SSO payload:', { nonce, return_sso_url });
     
+    // Store the request with a timestamp and used flag
     pendingSSORequests.set(nonce, {
       return_sso_url,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      used: false
     });
-    console.log('Stored SSO request. Current pending requests:', Array.from(pendingSSORequests.keys()));
     
+    console.log('Stored SSO request:', {
+      nonce,
+      return_sso_url,
+      timestamp: Date.now(),
+      currentPendingRequests: Array.from(pendingSSORequests.entries())
+    });
 
-    // Wait 10 seconds and then redirect to the login page
-    setTimeout(() => {
-      const redirectUrl = `/?nonce=${nonce}`;
-      console.log('Redirecting to:', redirectUrl);
-      res.redirect(redirectUrl);
-    }, 10000);
+    // Redirect immediately to the login page
+    const redirectUrl = `/?nonce=${nonce}`;
+    console.log('Redirecting to:', redirectUrl);
+    res.redirect(redirectUrl);
 
   } catch (error) {
     console.error('Error processing SSO request:', error);
@@ -116,26 +121,84 @@ router.get('/check-nonce', (req, res) => {
 
 // Complete SSO after verification
 router.post('/complete-sso', async (req, res) => {
+  console.log('=== Completing SSO ===');
+  console.log('Request body:', req.body);
+  
   const { nonce } = req.body;
+  console.log('Nonce from request:', nonce);
+  console.log('Current pending requests:', Array.from(pendingSSORequests.entries()));
 
   if (!nonce) {
+    console.log('Missing nonce in request');
     return res.status(400).json({ error: 'Missing nonce' });
   }
 
   const ssoRequest = pendingSSORequests.get(nonce);
   if (!ssoRequest) {
+    console.log('Invalid or expired nonce:', nonce);
     return res.status(400).json({ error: 'Invalid or expired nonce' });
   }
 
-  // Clean up pending request
-  pendingSSORequests.delete(nonce);
+  // Check if this nonce has already been used
+  if (ssoRequest.used) {
+    console.log('Nonce already used:', nonce);
+    // If the nonce was already used, just return success
+    return res.json({ 
+      success: true,
+      message: 'SSO already completed',
+      redirectUrl: ssoRequest.return_sso_url
+    });
+  }
+
+  console.log('Found valid SSO request:', ssoRequest);
+
+  // Mark the nonce as used
+  ssoRequest.used = true;
+  pendingSSORequests.set(nonce, ssoRequest);
 
   try {
-    // Create SSO response
-    const { payload, signature } = createSSOResponse(nonce);
+    // Create the response payload according to Discourse requirements
+    const params = new URLSearchParams();
     
-    // Redirect back to Discourse
-    const redirectUrl = `${ssoRequest.return_sso_url}?sso=${encodeURIComponent(payload)}&sig=${signature}`;
+    // Required fields
+    params.append('nonce', nonce);
+    params.append('email', 'userrrr@example.com'); // Replace with actual user email
+    params.append('external_id', '12345'); // Replace with actual user ID
+    
+    // Additional fields
+    params.append('username', 'user12345'); // Replace with actual username
+    params.append('name', 'User Names'); // Replace with actual name
+    
+    // Security: Force email validation
+    params.append('require_activation', 'false');
+    
+    // Optional: Suppress welcome message
+    params.append('suppress_welcome_message', 'true');
+
+    // Create the payload
+    const payload = params.toString();
+    console.log('Created payload:', payload);
+    
+    const base64Payload = Buffer.from(payload).toString('base64');
+    console.log('Base64 encoded payload:', base64Payload);
+    
+    // Sign the payload
+    const hmac = crypto.createHmac('sha256', config.discourseConnectSecret);
+    hmac.update(base64Payload);
+    const signature = hmac.digest('hex');
+    console.log('Generated signature:', signature);
+
+    // Create the final URL
+    const redirectUrl = `${ssoRequest.return_sso_url}?sso=${encodeURIComponent(base64Payload)}&sig=${signature}`;
+    console.log('Final redirect URL:', redirectUrl);
+    
+    // Clean up the nonce after a short delay to allow for the redirect
+    setTimeout(() => {
+      pendingSSORequests.delete(nonce);
+      console.log('Cleaned up used nonce:', nonce);
+    }, 5000);
+    
+    // Send the redirect URL
     res.json({ redirectUrl });
   } catch (error) {
     console.error('Error completing SSO:', error);
