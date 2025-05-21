@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import proofConfig from '../config/proofConfig.json';
 import { proofService } from '../services/proofService';
+import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
 
 function ProofCreator() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nonce = localStorage.getItem('discourse_nonce');
+  console.log('ProofCreator - Current URL:', window.location.href);
+  console.log('ProofCreator - Retrieved nonce from localStorage:', nonce);
+  console.log('ProofCreator - All URL parameters:', Object.fromEntries(searchParams.entries()));
+  
   const jwt = localStorage.getItem('idToken');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('initializing');
   const [userEmail, setUserEmail] = useState('');
   const [verificationResult, setVerificationResult] = useState(null);
+  const [discourseReturnUrl, setDiscourseReturnUrl] = useState(null);
 
   useEffect(() => {
     const initialize = async () => {
@@ -48,21 +57,38 @@ function ProofCreator() {
         setVerificationResult(result);
         setStatus('complete');
 
+        console.log(result);
+        console.log("nonce: " + nonce);
+        
+        
         if (result.isValid) {
-          const redirectUrl = import.meta.env.VITE_LOGIN_REDIRECT;
-          if (redirectUrl) {
-            // If it's an external URL, use window.location
-            if (redirectUrl.startsWith('https') || redirectUrl.startsWith('http')) {
-              setTimeout(() => window.location.href = redirectUrl, 3000);
-            } 
-            else {
-              // If it's an internal route, use navigate
-              setTimeout(() => navigate(redirectUrl, { replace: true }), 3000);
+
+          if (nonce) {
+            try {
+              // Check if nonce is valid and get return URL
+              const { data: ssoCheck } = await axios.get(`/api/discourse/check-nonce?nonce=${nonce}`);
+              if (ssoCheck.valid) {
+                setDiscourseReturnUrl(ssoCheck.returnUrl);
+                // Complete SSO
+                const { data: ssoResponse } = await axios.post('/api/discourse/complete-sso', {
+                  nonce
+                });
+                
+                // Redirect to Discourse
+                window.location.href = ssoResponse.redirectUrl;
+                return;
+              }
+            } catch (err) {
+              console.error('Error handling Discourse SSO:', err);
+              // Fall through to normal redirect if SSO fails
             }
-          } else {
-            // Fallback to home if no redirect URL is specified
-            setTimeout(() => navigate('/', { replace: true }), 3000);
           }
+
+          // Wait 10 seconds and then redirect to the login page
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 10000);
+
         }
       } catch (err) {
         setError(err.message);
@@ -71,7 +97,7 @@ function ProofCreator() {
     };
 
     processProof();
-  }, [status, jwt, navigate]);
+  }, [status, jwt, navigate, nonce]);
 
   const getStatusMessage = () => {
     switch (status) {
@@ -84,7 +110,9 @@ function ProofCreator() {
       case 'verifying':
         return 'Verifying proof with the server...';
       case 'complete':
-        return 'Proof process completed! Redirecting...';
+        return discourseReturnUrl 
+          ? 'Proof verified! Redirecting to Discourse...'
+          : 'Proof process completed! Redirecting...';
       case 'error':
         return 'An error occurred during the process.';
       default:

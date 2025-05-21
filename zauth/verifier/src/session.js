@@ -61,4 +61,10 @@ setInterval(() => {
   sessionManager.cleanupExpiredSessions();
 }, 60 * 60 * 1000);
 
-module.exports = sessionManager; 
+// Create a Map to store pending SSO requests
+const pendingSSORequests = new Map();
+
+module.exports = {
+    sessionManager,
+    pendingSSORequests
+}; 

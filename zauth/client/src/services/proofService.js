@@ -74,7 +74,7 @@ class ProofService {
 
   async verifyProof(proofVerify, publicInputs) {
     try {
-      const response = await axios.post(`${this.apiBaseUrl}/api/verify-jwt-proof`, {
+      const response = await axios.post(`${this.apiBaseUrl}/api/verify/verify-jwt-proof`, {
         proofVerify: JSON.stringify(Array.from(proofVerify)),
         publicInputs: JSON.stringify(publicInputs, null, 2)
       });

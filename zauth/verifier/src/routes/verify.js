@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const circuitManager = require('../circuit');
-const sessionManager = require('../session');
+const { sessionManager } = require('../session');
 
 router.post('/verify-jwt-proof', async (req, res) => {
   try {
     console.log('Received request body:', JSON.stringify(req.body, null, 2));
 
-    
     const { proofVerify, publicInputs } = req.body;
 
     if (!proofVerify || !publicInputs) {

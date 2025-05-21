@@ -1,9 +1,32 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Typography, Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Immediate nonce handling
+  const nonce = searchParams.get('nonce');
+  console.log('Login component - Current URL:', window.location.href);
+  console.log('Login component - All URL parameters:', Object.fromEntries(searchParams.entries()));
+  console.log('Login component - Nonce from URL:', nonce);
+
+  if (nonce) {
+    console.log('Login component - Storing nonce in localStorage:', nonce);
+    localStorage.setItem('discourse_nonce', nonce);
+    // Verify storage
+    const storedNonce = localStorage.getItem('discourse_nonce');
+    console.log('Login component - Verified stored nonce:', storedNonce);
+  }
+
+  useEffect(() => {
+    console.log('Login component mounted');
+    // Additional logging for component lifecycle
+    return () => {
+      console.log('Login component unmounted');
+    };
+  }, []);
 
   const handleGoogleLogin = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
