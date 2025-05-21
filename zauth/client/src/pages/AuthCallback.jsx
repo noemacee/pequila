@@ -1,15 +1,13 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, Container } from '@mui/material';
-import { handleGoogleCallback } from '../utils/auth';
 
-function AuthCallback({ setIsAuthenticated }) {
+function AuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
     const processCallback = async () => {
       try {
-        // Get the ID token from the URL hash
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const idToken = params.get('id_token');
@@ -18,20 +16,16 @@ function AuthCallback({ setIsAuthenticated }) {
           throw new Error('No ID token found');
         }
 
-        // Handle the Google callback and wait for it to complete
-        await handleGoogleCallback(idToken);
-        setIsAuthenticated(true);
+        localStorage.setItem('idToken', idToken);
         navigate('/create-proof', { replace: true });
       } catch (error) {
         console.error('Error in auth callback:', error);
-        setIsAuthenticated(false);
-        navigate('/login', { replace: true });
+        navigate('/', { replace: true });
       }
     };
 
-    // Execute immediately
     processCallback();
-  }, [navigate, setIsAuthenticated]);
+  }, [navigate]);
 
   return (
     <Container maxWidth="sm">

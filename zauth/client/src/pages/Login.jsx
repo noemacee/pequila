@@ -1,39 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
 function Login() {
-  const [nonce] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Load Google Identity Services Script
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const redirectUri = import.meta.env.VITE_REDIRECT_URI;
-
-    console.log('clientId:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
-    console.log('redirectUri:', import.meta.env.VITE_REDIRECT_URI);
     const scope = 'openid email profile';
-    const finalNonce = nonce.trim() !== '' ? nonce : Math.random().toString(36).substring(2);
+    const nonce = Math.random().toString(36).substring(2);
     
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${clientId}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=id_token token&` +
       `scope=${encodeURIComponent(scope)}&` +
-      `nonce=${finalNonce}&` +
+      `nonce=${nonce}&` +
       `prompt=select_account`;
 
     window.location.href = authUrl;
@@ -42,7 +25,13 @@ function Login() {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
+        height: '100vh',
+        width: '100vw',
+        margin: 0,
+        padding: 0,
+        position: 'fixed',
+        top: 0,
+        left: 0,
         background: 'radial-gradient(circle at center, #2C3333 0%, #3a4242 50%, #4d5757 100%)',
         display: 'flex',
         alignItems: 'center',
@@ -56,7 +45,7 @@ function Login() {
           flexDirection: 'column',
           alignItems: 'center',
           gap: 4,
-          maxWidth: '400px',
+          maxWidth: '600px',
           width: '100%',
           textAlign: 'center',
           p: 3,
@@ -67,8 +56,8 @@ function Login() {
           src="/logo/logo.svg"
           alt="Zauth Logo"
           sx={{
-            width: '120px',
-            height: '120px',
+            width: '100px',
+            height: '100px',
             filter: 'drop-shadow(0 0 20px rgba(255, 255, 255, 0.1))',
           }}
         />
@@ -84,38 +73,21 @@ function Login() {
             textShadow: '0 2px 10px rgba(0,0,0,0.2)',
           }}
         >
-          Welcome to Zauth
-        </Typography>
-
-        <Typography
-          variant="subtitle1"
-          sx={{
-            opacity: 0.8,
-            maxWidth: '400px',
-            lineHeight: 1.6,
-            fontWeight: 400,
-          }}
-        >
-          Sign in with your Google account to create your Zauth proof
+          Zauth Login
         </Typography>
 
         <Button
           variant="contained"
           onClick={handleGoogleLogin}
           sx={{
-            backgroundColor: '#0E8388',
-            color: '#CBE4DE',
-            padding: '12px 40px',
-            fontSize: '1.1rem',
-            borderRadius: '50px',
-            textTransform: 'none',
+            backgroundColor: '#fff',
+            color: '#2C3333',
             '&:hover': {
-              backgroundColor: '#2E4F4F',
+              backgroundColor: '#f0f0f0',
             },
-            transition: 'all 0.3s ease',
           }}
         >
-          Sign in with Google
+          Login with Google
         </Button>
       </Box>
     </Box>

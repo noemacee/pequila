@@ -1,234 +1,77 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
-import { UltraHonkBackend } from '@aztec/bb.js';
-import { Noir } from '@noir-lang/noir_js';
-import { generateInputs } from '../utils/jwtProof';
-import { jwtDecode } from 'jwt-decode';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import proofConfig from '../config/proofConfig.json';
-import { sessionManager } from '../utils/session';
-
-let noir = null;
-let backend = null;
+import { proofService } from '../services/proofService';
 
 function ProofCreator() {
   const navigate = useNavigate();
   const jwt = localStorage.getItem('idToken');
-  const [inputs, setInputs] = useState({
-    merkle_root: proofConfig.merkle_root,
-    proof_siblings: JSON.stringify(proofConfig.proof_siblings),
-    proof_index: proofConfig.proof_index,
-  });
-  const [proofVerify, setProofVerify] = useState(null);
-  const [publicInputs, setPublicInputs] = useState(null);
   const [error, setError] = useState('');
-  const [circuitLoaded, setCircuitLoaded] = useState(false);
-  const [pubkey, setPubkey] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState(null);
   const [status, setStatus] = useState('initializing');
   const [userEmail, setUserEmail] = useState('');
+  const [verificationResult, setVerificationResult] = useState(null);
 
-  // Load circuit on mount
   useEffect(() => {
-    const loadCircuit = async () => {
+    const initialize = async () => {
       try {
-        const response = await fetch('/zuitzpass.json');
-        const circuit = await response.json();
-        
-        // Initialize Noir and backend
-        noir = new Noir(circuit);
-        backend = new UltraHonkBackend(circuit.bytecode);
-        
-        setCircuitLoaded(true);
-        console.log('Circuit loaded successfully');
-        console.log(backend)
-        
+        await proofService.initializeCircuit();
         setStatus('ready');
       } catch (err) {
-        console.error('Error loading circuit:', err);
-        setError('Error loading circuit: ' + err.message);
+        setError(err.message);
         setStatus('error');
       }
     };
 
-    loadCircuit();
+    initialize();
   }, []);
 
-  // Fetch Google JWK for the JWT's kid
   useEffect(() => {
-    if (!jwt) return;
-    
-    const fetchPubkey = async () => {
+    const processProof = async () => {
+      if (status !== 'ready' || !jwt) return;
+
       try {
-        const header = JSON.parse(atob(jwt.split('.')[0].replace(/-/g, '+').replace(/_/g, '/')));
-        const response = await fetch('https://www.googleapis.com/oauth2/v3/certs');
+        setStatus('generating');
+        const pubkey = await proofService.fetchGooglePubkey(jwt);
+        setUserEmail(proofService.getUserEmail(jwt));
 
-        console.log('Fetching Google public key...')
-        
-        const jwks = await response.json();
-        const key = jwks.keys.find(k => k.kid === header.kid);
-        if (!key) throw new Error('Google public key not found for JWT');
-        setPubkey(key);
-        console.log(key)
-        
-        // Set user email from JWT
-        const decoded = jwtDecode(jwt);
+        const { proofVerify, publicInputs } = await proofService.generateProof(
+          jwt,
+          pubkey,
+          proofConfig.merkle_root,
+          proofConfig.proof_siblings,
+          proofConfig.proof_index
+        );
 
-        console.log('JWT decoded:', decoded)
-        setUserEmail(decoded.email);
+        setStatus('verifying');
+        const result = await proofService.verifyProof(proofVerify, publicInputs);
+        setVerificationResult(result);
+        setStatus('complete');
+
+        if (result.isValid) {
+          const redirectUrl = import.meta.env.VITE_LOGIN_REDIRECT;
+          if (redirectUrl) {
+            // If it's an external URL, use window.location
+            if (redirectUrl.startsWith('https') || redirectUrl.startsWith('http')) {
+              setTimeout(() => window.location.href = redirectUrl, 3000);
+            } 
+            else {
+              // If it's an internal route, use navigate
+              setTimeout(() => navigate(redirectUrl, { replace: true }), 3000);
+            }
+          } else {
+            // Fallback to home if no redirect URL is specified
+            setTimeout(() => navigate('/', { replace: true }), 3000);
+          }
+        }
       } catch (err) {
-        console.error('Error fetching Google public key:', err);
-        setError('Error fetching Google public key: ' + err.message);
+        setError(err.message);
         setStatus('error');
       }
     };
 
-    fetchPubkey();
-  }, [jwt]);
-
-  // Auto-generate and verify proof when everything is ready
-  useEffect(() => {
-    if (status === 'ready' && circuitLoaded && pubkey && jwt) {
-      handleGenerateProof();
-    }
-  }, [status, circuitLoaded, pubkey, jwt]);
-
-  // Handle successful verification and redirect
-  useEffect(() => {
-    if (verificationResult?.isValid) {
-      const timer = setTimeout(() => {
-        navigate('/apps', { replace: true });
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [verificationResult, navigate]);
-
-  const handleChange = (e) => {
-    setInputs({ ...inputs, [e.target.name]: e.target.value });
-  };
-
-  const handleGenerateProof = async () => {
-    setError('');
-    setProofVerify(null);
-    setPublicInputs(null);
-    setVerificationResult(null);
-    setIsGenerating(true);
-    setStatus('generating');
-
-    try {
-      if (!noir || !backend) {
-        throw new Error('Circuit not loaded yet. Please wait.');
-      }
-      if (!pubkey) {
-        throw new Error('Google public key not loaded yet.');
-      }
-      if (!jwt) {
-        throw new Error('No JWT found in localStorage.');
-      }
-
-      const maxSignedDataLength = 910;
-
-      const circuitInputs = await generateInputs({
-        jwt,
-        pubkey,
-        maxSignedDataLength,
-        merkle_root: inputs.merkle_root,
-        proof_siblings: JSON.parse(inputs.proof_siblings),
-        proof_index: Number(inputs.proof_index),
-      });
-      console.log('Inputs generated')
-      console.log(circuitInputs)
-
-      const { witness } = await noir.execute(circuitInputs);
-      console.log('Witness generated');
-      console.log(witness)
-
-      const proof = await backend.generateProof(witness);
-      console.log('Proof generated');
-      console.log(proof)
-      const proofVerify = proof.proof
-      const publicInputs = proof.publicInputs
-
-      setProofVerify(proofVerify);
-      setPublicInputs(publicInputs);
-      setStatus('verifying');
-
-      
-      // Automatically verify the proof
-      await handleVerifyProof(proofVerify, publicInputs);
-
-    } catch (err) {
-      console.error('Proof generation failed:', err);
-      setError('Proof generation failed: ' + err.message);
-      setStatus('error');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleVerifyProof = async (proofToVerify = proofVerify, inputsToVerify = publicInputs) => {
-    setError('');
-    setVerificationResult(null);
-    setIsVerifying(true);
-
-    try {
-      if (!proofToVerify || !inputsToVerify) {
-        throw new Error('No proof to verify. Please generate a proof first.');
-      }
-
-      const response = await axios.post('http://localhost:4000/api/verify-jwt-proof', {
-        proofVerify: JSON.stringify(Array.from(proofToVerify)),
-        publicInputs: JSON.stringify(inputsToVerify, null, 2)
-      });
-
-      console.log('Verification resulte:', response.data);
-      console.log('Session data in response:', response.data.session);
-
-      // Store the session token using session manager
-      if (response.data.session?.token) {
-        console.log('Setting up session with token:', response.data.session.token);
-        console.log('Session expires at:', response.data.session.expiresAt);
-        
-        sessionManager.setupSession(
-          response.data.session.token,
-          response.data.session.expiresAt
-        );
-
-        console.log('sessionToken in localStorage:', localStorage.getItem('sessionToken'));
-        console.log('sessionExpiresAt in localStorage:', localStorage.getItem('sessionExpiresAt'));
-        
-        // Verify the token was stored
-        const storedToken = sessionManager.getToken();
-        console.log('Stored token:', storedToken);
-        console.log('Session valid:', sessionManager.isSessionValid());
-        
-        // Set default Authorization header for future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        console.log('Set Authorization header:', axios.defaults.headers.common['Authorization']);
-      } else {
-        console.warn('No session token in response:', response.data);
-      }
-
-      setVerificationResult({
-        isValid: response.data.verified,
-        message: response.data.message
-      });
-      setStatus('complete');
-    } catch (err) {
-      console.error('Verification failed:', err);
-      if (err.response?.data) {
-        console.error('Server error details:', err.response.data);
-      }
-      const errorMessage = err.response?.data?.message || err.message;
-      setError(`Verification failed: ${errorMessage}`);
-      setStatus('error');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
+    processProof();
+  }, [status, jwt, navigate]);
 
   const getStatusMessage = () => {
     switch (status) {
@@ -241,7 +84,7 @@ function ProofCreator() {
       case 'verifying':
         return 'Verifying proof with the server...';
       case 'complete':
-        return 'Proof process completed! Redirecting to home...';
+        return 'Proof process completed! Redirecting...';
       case 'error':
         return 'An error occurred during the process.';
       default:
