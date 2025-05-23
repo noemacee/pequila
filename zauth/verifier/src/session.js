@@ -5,32 +5,38 @@ class SessionManager {
     // In-memory store for sessions (in production, use Redis or a database)
     this.sessions = new Map();
     this.SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+    this.startCleanupInterval();
   }
 
   // Create a new session after successful proof verification
-  createSession() {
+  createSession(userId) {
     // Generate a random session token
-    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = Date.now() + this.SESSION_DURATION;
 
     // Store session data
-    this.sessions.set(sessionToken, {
+    this.sessions.set(token, {
+      userId,
       expiresAt,
       createdAt: Date.now()
     });
 
     return {
-      sessionToken,
+      token,
       expiresAt
     };
   }
 
   // Validate a session token
-  validateSession(sessionToken) {
-    const session = this.sessions.get(sessionToken);
+  validateSession(token) {
+    const session = this.sessions.get(token);
     
-    if (!session || Date.now() > session.expiresAt) {
-      this.sessions.delete(sessionToken);
+    if (!session) {
+      return null;
+    }
+
+    if (Date.now() > session.expiresAt) {
+      this.sessions.delete(token);
       return null;
     }
 
@@ -38,30 +44,27 @@ class SessionManager {
   }
 
   // Remove a session (logout)
-  removeSession(sessionToken) {
-    this.sessions.delete(sessionToken);
+  removeSession(token) {
+    this.sessions.delete(token);
   }
 
-  // Clean up expired sessions
-  cleanupExpiredSessions() {
-    const now = Date.now();
-    for (const [sessionToken, session] of this.sessions.entries()) {
-      if (now > session.expiresAt) {
-        this.sessions.delete(sessionToken);
+  startCleanupInterval() {
+    // Clean up expired sessions every hour
+    setInterval(() => {
+      const now = Date.now();
+      for (const [token, session] of this.sessions.entries()) {
+        if (now > session.expiresAt) {
+          this.sessions.delete(token);
+        }
       }
-    }
+    }, 60 * 60 * 1000); // 1 hour
   }
 }
 
 // Create a singleton instance
 const sessionManager = new SessionManager();
 
-// Clean up expired sessions every hour
-setInterval(() => {
-  sessionManager.cleanupExpiredSessions();
-}, 60 * 60 * 1000);
-
-// Create a Map to store pending SSO requests
+// Store for pending SSO requests
 const pendingSSORequests = new Map();
 
 module.exports = {
