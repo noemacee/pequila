@@ -82,10 +82,20 @@ There are two main actors:
   - Threshold encryption for the nullifiers avoids one administrator decrypting every nullifier by itself and requires an MPC between the administrators to decrypt a nullifier. The secret shares can be distributed amongst a large number of people to avoid collusion.
   - On-chain Trees with verifiable and rate limited (timelocks) functions to provide accountability for Administrators' actions.
   - On-chain messages to provide censorship resistance (messages can still be hidden on the frontend).
+  - It is possible to use dRand as a randomness beacon to ban users only temporarily.
+  - It is possible to give users several warnings to limit their actions without directly banning them.
+
+*Here are multiple pictures illustrating the differences between the different versions:*
+![v0.1](image.png)
+![v0.2](image-1.png)
+![v0.3](image-2.png)
+![v0.4](image-3.png)
 
 ## Subsequent integrations
-  1. **Anonymous Forum**
-   - Leveraging the existant Discourse Forum, it is possible to add a new login method: zuitzAnon. Admins will be able to ban users without deanonymizing them. Admins can also be the users of the forum themselves.
+1. **Anonymous Forum**
+- Leveraging the existant Discourse Forum, it is possible to add a new login method: zuitzAnon. Admins will be able to ban users without deanonymizing them. Admins can also be the users of the forum themselves.
+2. **zuLink**
+    Zulink can integrate zuitzAnon for its authentication mechanism and if someone abuse the service it can be banned for some time or permanently
 1. **PCD Database**
    - Clients will store full Proof-Carrying Data (PCD) locally.
    - Server holds only **commitments + salts** in a Merkle tree for **unlinkable**, **auditable**, **private** storage of every proof generated during the event.
@@ -94,7 +104,6 @@ There are two main actors:
 3. **Universal PCD Platform**
    - Extend beyond anonymous login: anonymous proofs of age, nationality, bank balances (via Open Banking), on-chain protocol interactions, wallet liquidity, and more.
    - One proof per credential, re-usable and privately verifiable on-chain or off-chain.
-
 
 ## Notes on constraint counts, proving times & UX considerations
 
