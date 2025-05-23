@@ -145,11 +145,24 @@ npm install
 
 3. **Configure environment variables:**
 
+You have to create a client for your application, and register alongside Google Cloud to have access to the "Login with Google" functionnality. Have a look at https://www.youtube.com/watch?v=TjMhPr59qn4&t=72s to easily set it up. Once you have this you have to fill up some .env variables.
+
 - In `zauth/client/`, create a `.env` file:
   ```env
   VITE_GOOGLE_CLIENT_ID=your-google-client-id
   VITE_REDIRECT_URI=your-redirect-uri
   ```
+
+
+Take a look at https://meta.discourse.org/t/setup-discourseconnect-official-single-sign-on-for-discourse-sso/13045 to make your Discourse Forum accept our authentification logic today!
+
+
+- In `zauth/verifier/`, create a `.env` file:
+  ```env
+  DISCOURSE_CONNECT_SECRET=your-discourse-secret-key
+  NODE_ENV=development
+  ```
+
 
 4. **Start the development servers:**
 
@@ -162,8 +175,6 @@ npm run dev
 ```
 
 Your Discourse forum can now accept authentifications coming from our server! 
-
-Take a look at https://meta.discourse.org/t/setup-discourseconnect-official-single-sign-on-for-discourse-sso/13045 to make your Discourse Forum accept our authentification logic today!
 
 5. **Merkle Proof Configuration:**
 
