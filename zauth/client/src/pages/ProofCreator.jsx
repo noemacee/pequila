@@ -10,6 +10,7 @@ function ProofCreator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nonce = localStorage.getItem('discourse_nonce');
+  const [hasRedirected, setHasRedirected] = useState(false);
   console.log('ProofCreator - Current URL:', window.location.href);
   console.log('ProofCreator - Retrieved nonce from localStorage:', nonce);
   console.log('ProofCreator - All URL parameters:', Object.fromEntries(searchParams.entries()));
@@ -37,7 +38,7 @@ function ProofCreator() {
 
   useEffect(() => {
     const processProof = async () => {
-      if (status !== 'ready' || !jwt) return;
+      if (status !== 'ready' || !jwt || hasRedirected) return;
 
       try {
         setStatus('generating');
@@ -57,42 +58,57 @@ function ProofCreator() {
         setVerificationResult(result);
         setStatus('complete');
 
-        console.log(result);
-        console.log("nonce: " + nonce);
-        
+        console.log('Proof verification result:', result);
+        console.log('Current nonce:', nonce);
         
         if (result.isValid) {
-
           if (nonce) {
             try {
               // Check if nonce is valid and get return URL
               const { data: ssoCheck } = await axios.get(`/api/discourse/check-nonce?nonce=${nonce}`);
+              console.log('SSO check response:', ssoCheck);
+              
               if (ssoCheck.valid) {
                 setDiscourseReturnUrl(ssoCheck.returnUrl);
                 // Complete SSO
                 const { data: ssoResponse } = await axios.post('/api/discourse/complete-sso', {
                   nonce
                 });
+                console.log('SSO completion response:', ssoResponse);
                 
-                // Redirect to Discourse
-                window.location.href = ssoResponse.redirectUrl;
-                return;
+                if (ssoResponse.redirectUrl) {
+                  // Set redirect flag before redirecting
+                  setHasRedirected(true);
+                  // Clear the nonce from localStorage
+                  localStorage.removeItem('discourse_nonce');
+                  // Redirect to Discourse
+                  window.location.href = ssoResponse.redirectUrl;
+                  return;
+                } else {
+                  throw new Error('No redirect URL in SSO response');
+                }
+              } else {
+                throw new Error('Invalid or expired nonce');
               }
             } catch (err) {
               console.error('Error handling Discourse SSO:', err);
-              // Fall through to normal redirect if SSO fails
+              setError(err.response?.data?.error || err.message || 'Failed to complete SSO process');
+              setStatus('error');
             }
+          } else {
+            setError('No SSO nonce found');
+            setStatus('error');
           }
-
         }
       } catch (err) {
+        console.error('Error in proof process:', err);
         setError(err.message);
         setStatus('error');
       }
     };
 
     processProof();
-  }, [status, jwt, navigate, nonce]);
+  }, [status, jwt, nonce, hasRedirected]);
 
   const getStatusMessage = () => {
     switch (status) {
