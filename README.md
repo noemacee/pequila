@@ -110,7 +110,6 @@ Join us in making private, unlinkable, verifiable identity as easy as "login wit
 
 ## Demo Video:
 
-https://github.com/user-attachments/assets/d749f6ea-8b5b-4ec8-96e2-49977d8ca26a
 
 
 **Notes on testing by judges**: 
@@ -161,6 +160,10 @@ npm run dev
 # Start the client (from client directory)
 npm run dev
 ```
+
+Your Discourse forum can now accept authentifications coming from our server! 
+
+Take a look at https://meta.discourse.org/t/setup-discourseconnect-official-single-sign-on-for-discourse-sso/13045 to make your Discourse Forum accept our authentification logic today!
 
 5. **Merkle Proof Configuration:**
 
