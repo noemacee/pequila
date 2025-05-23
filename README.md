@@ -84,6 +84,7 @@ There are two main actors:
   - On-chain messages to provide censorship resistance (messages can still be hidden on the frontend).
   - It is possible to use dRand as a randomness beacon to ban users only temporarily.
   - It is possible to give users several warnings to limit their actions without directly banning them.
+  - Add [Rate Limiting Nullifier](https://rate-limiting-nullifier.github.io/rln-docs/what_is_rln.html) to avoid spam 
 
 *Here are multiple pictures illustrating the differences between the different versions:*
 ![v0.1](image.png)
