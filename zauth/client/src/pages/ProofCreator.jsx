@@ -84,11 +84,6 @@ function ProofCreator() {
             }
           }
 
-          // Wait 10 seconds and then redirect to the login page
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 10000);
-
         }
       } catch (err) {
         setError(err.message);

@@ -26,35 +26,6 @@ function decodeSSOPayload(payload) {
   return result;
 }
 
-// Helper function to create SSO response
-function createSSOResponse(nonce) {
-  const params = new URLSearchParams();
-  // Required fields
-  params.append('nonce', nonce);
-  params.append('email', 'anyone@zuitzerland.com');
-  params.append('external_id', '1');
-  
-  // Additional fields
-  params.append('username', 'anonymous');
-  params.append('name', 'anonymous');
-  
-  // Security: Force email validation since we're not validating emails
-  params.append('require_activation', 'true');
-  
-  // Optional: Suppress welcome message
-  params.append('suppress_welcome_message', 'true');
-
-  const payload = params.toString();
-  const base64Payload = Buffer.from(payload).toString('base64');
-  const hmac = crypto.createHmac('sha256', config.discourseConnectSecret);
-  hmac.update(base64Payload);
-  const signature = hmac.digest('hex');
-
-  return {
-    payload: base64Payload,
-    signature
-  };
-}
 
 // Initial SSO request from Discourse
 router.get('/sso', (req, res) => {
@@ -159,15 +130,19 @@ router.post('/complete-sso', async (req, res) => {
   try {
     // Create the response payload according to Discourse requirements
     const params = new URLSearchParams();
+
+    // random identifier
+    const identifier = crypto.randomBytes(16).toString('hex');
+
     
     // Required fields
     params.append('nonce', nonce);
-    params.append('email', 'userrrr@example.com'); // Replace with actual user email
-    params.append('external_id', '12345'); // Replace with actual user ID
+    params.append('email', identifier + '@example.com'); // Replace with actual user email
+    params.append('external_id', identifier); // Replace with actual user ID
     
     // Additional fields
-    params.append('username', 'user12345'); // Replace with actual username
-    params.append('name', 'User Names'); // Replace with actual name
+    params.append('username', identifier); // Replace with actual username
+    params.append('name', 'Satoshi Nakamoto'); // Replace with actual name
     
     // Security: Force email validation
     params.append('require_activation', 'false');

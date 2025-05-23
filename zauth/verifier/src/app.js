@@ -27,8 +27,6 @@ app.get('/sso', (req, res) => {
   console.log('Received SSO request at /sso');
   console.log('Query parameters:', req.query);
   
-  console.log('Waiting 10 seconds before processing SSO request...');
-  
   // Send initial response
   res.writeHead(200, {
     'Content-Type': 'text/html'
@@ -76,75 +74,73 @@ app.get('/sso', (req, res) => {
     </html>
   `);
   
-  setTimeout(() => {
-    const { sso, sig } = req.query;
-    if (!sso || !sig) {
-      console.log('Missing SSO parameters:', { sso: !!sso, sig: !!sig });
-      res.end(JSON.stringify({ error: 'Missing SSO parameters' }));
-      return;
-    }
+  const { sso, sig } = req.query;
+  if (!sso || !sig) {
+    console.log('Missing SSO parameters:', { sso: !!sso, sig: !!sig });
+    res.end(JSON.stringify({ error: 'Missing SSO parameters' }));
+    return;
+  }
 
-    // Validate signature according to Discourse documentation
-    const hmac = crypto.createHmac('sha256', config.discourseConnectSecret);
-    hmac.update(sso); // Use the raw sso parameter directly
-    const expectedSignature = hmac.digest('hex');
-    
-    console.log('Signature validation details:', {
-      receivedSignature: sig,
-      expectedSignature,
-      secretKey: config.discourseConnectSecret,
-      rawPayload: sso,
-      decodedPayload: Buffer.from(sso, 'base64').toString()
-    });
-    
-    if (expectedSignature !== sig) {
-      console.log('Invalid signature. Please check that discourse_connect_secret matches between Discourse and this server.');
-      res.end(JSON.stringify({ 
-        error: 'Invalid signature',
-        details: {
-          receivedSignature: sig,
-          expectedSignature,
-          secretKeyLength: config.discourseConnectSecret.length
-        }
-      }));
-      return;
-    }
-
-    try {
-      // Decode SSO payload
-      const decoded = Buffer.from(sso, 'base64').toString();
-      const params = new URLSearchParams(decoded);
-      const nonce = params.get('nonce');
-      const return_sso_url = params.get('return_sso_url');
-      
-      console.log('Decoded SSO payload:', { nonce, return_sso_url });
-      
-      // Store in pending requests
-      if (nonce && return_sso_url) {
-        pendingSSORequests.set(nonce, {
-          return_sso_url,
-          timestamp: Date.now()
-        });
-        console.log('Stored SSO request. Current pending requests:', Array.from(pendingSSORequests.keys()));
-        
-        // Redirect to the root path with the nonce
-        const redirectUrl = `/?nonce=${nonce}`;
-        console.log('Redirecting to:', redirectUrl);
-        res.write(`
-          <script>
-            window.location.href = "${redirectUrl}";
-          </script>
-        `);
-        res.end();
-      } else {
-        console.log('Missing nonce or return_sso_url in payload');
-        res.end(JSON.stringify({ error: 'Invalid SSO payload' }));
+  // Validate signature according to Discourse documentation
+  const hmac = crypto.createHmac('sha256', config.discourseConnectSecret);
+  hmac.update(sso); // Use the raw sso parameter directly
+  const expectedSignature = hmac.digest('hex');
+  
+  console.log('Signature validation details:', {
+    receivedSignature: sig,
+    expectedSignature,
+    secretKey: config.discourseConnectSecret,
+    rawPayload: sso,
+    decodedPayload: Buffer.from(sso, 'base64').toString()
+  });
+  
+  if (expectedSignature !== sig) {
+    console.log('Invalid signature. Please check that discourse_connect_secret matches between Discourse and this server.');
+    res.end(JSON.stringify({ 
+      error: 'Invalid signature',
+      details: {
+        receivedSignature: sig,
+        expectedSignature,
+        secretKeyLength: config.discourseConnectSecret.length
       }
-    } catch (error) {
-      console.error('Error processing SSO request:', error);
-      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }));
+    return;
+  }
+
+  try {
+    // Decode SSO payload
+    const decoded = Buffer.from(sso, 'base64').toString();
+    const params = new URLSearchParams(decoded);
+    const nonce = params.get('nonce');
+    const return_sso_url = params.get('return_sso_url');
+    
+    console.log('Decoded SSO payload:', { nonce, return_sso_url });
+    
+    // Store in pending requests
+    if (nonce && return_sso_url) {
+      pendingSSORequests.set(nonce, {
+        return_sso_url,
+        timestamp: Date.now()
+      });
+      console.log('Stored SSO request. Current pending requests:', Array.from(pendingSSORequests.keys()));
+      
+      // Redirect to the root path with the nonce
+      const redirectUrl = `/?nonce=${nonce}`;
+      console.log('Redirecting to:', redirectUrl);
+      res.write(`
+        <script>
+          window.location.href = "${redirectUrl}";
+        </script>
+      `);
+      res.end();
+    } else {
+      console.log('Missing nonce or return_sso_url in payload');
+      res.end(JSON.stringify({ error: 'Invalid SSO payload' }));
     }
-  }, 10000);
+  } catch (error) {
+    console.error('Error processing SSO request:', error);
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
 });
 
 // Debug route for root path
