@@ -11,9 +11,9 @@ function ProofCreator() {
   const [searchParams] = useSearchParams();
   const nonce = localStorage.getItem('discourse_nonce');
   const [hasRedirected, setHasRedirected] = useState(false);
-  console.log('ProofCreator - Current URL:', window.location.href);
-  console.log('ProofCreator - Retrieved nonce from localStorage:', nonce);
-  console.log('ProofCreator - All URL parameters:', Object.fromEntries(searchParams.entries()));
+  console.log('[CLIENT] ProofCreator - Current URL:', window.location.href);
+  console.log('[CLIENT] ProofCreator - Retrieved nonce from localStorage:', nonce);
+  console.log('[CLIENT] ProofCreator - All URL parameters:', Object.fromEntries(searchParams.entries()));
   
   const jwt = localStorage.getItem('idToken');
   const [error, setError] = useState('');
@@ -25,9 +25,12 @@ function ProofCreator() {
   useEffect(() => {
     const initialize = async () => {
       try {
+        console.log('[CLIENT] Initializing circuit...');
         await proofService.initializeCircuit();
+        console.log('[CLIENT] ✓ Circuit initialized successfully');
         setStatus('ready');
       } catch (err) {
+        console.error('[CLIENT] ❌ Error initializing circuit:', err);
         setError(err.message);
         setStatus('error');
       }
@@ -41,10 +44,18 @@ function ProofCreator() {
       if (status !== 'ready' || !jwt || hasRedirected) return;
 
       try {
+        console.log('[CLIENT] Starting proof generation process...');
         setStatus('generating');
+        
+        console.log('[CLIENT] Fetching Google public key...');
         const pubkey = await proofService.fetchGooglePubkey(jwt);
-        setUserEmail(proofService.getUserEmail(jwt));
+        console.log('[CLIENT] ✓ Google public key fetched');
+        
+        const email = proofService.getUserEmail(jwt);
+        setUserEmail(email);
+        console.log('[CLIENT] User email:', email);
 
+        console.log('[CLIENT] Generating ZK proof...');
         const { proofVerify, publicInputs } = await proofService.generateProof(
           jwt,
           pubkey,
@@ -52,31 +63,40 @@ function ProofCreator() {
           proofConfig.proof_siblings,
           proofConfig.proof_index
         );
+        console.log('[CLIENT] ✓ ZK proof generated successfully');
+        console.log('[CLIENT] Generated proof:', {
+          proofLength: proofVerify.length,
+          proofData: proofVerify,
+          publicInputs: publicInputs
+        });
 
+        console.log('[CLIENT] Verifying proof with server...');
         setStatus('verifying');
         const result = await proofService.verifyProof(proofVerify, publicInputs);
+        console.log('[CLIENT] Server verification response:', result);
         setVerificationResult(result);
         setStatus('complete');
+        console.log('[CLIENT] ✓ Proof verification result:', result);
 
-        console.log('Proof verification result:', result);
-        console.log('Current nonce:', nonce);
-        
         if (result.isValid) {
           if (nonce) {
             try {
+              console.log('[CLIENT] Starting SSO process with nonce:', nonce);
               // Check if nonce is valid and get return URL
               const { data: ssoCheck } = await axios.get(`/api/discourse/check-nonce?nonce=${nonce}`);
-              console.log('SSO check response:', ssoCheck);
+              console.log('[CLIENT] SSO check response:', ssoCheck);
               
               if (ssoCheck.valid) {
+                console.log('[CLIENT] Nonce is valid, completing SSO...');
                 setDiscourseReturnUrl(ssoCheck.returnUrl);
                 // Complete SSO
                 const { data: ssoResponse } = await axios.post('/api/discourse/complete-sso', {
                   nonce
                 });
-                console.log('SSO completion response:', ssoResponse);
+                console.log('[CLIENT] SSO completion response:', ssoResponse);
                 
                 if (ssoResponse.redirectUrl) {
+                  console.log('[CLIENT] ✓ SSO process complete, redirecting to Discourse...');
                   // Set redirect flag before redirecting
                   setHasRedirected(true);
                   // Clear the nonce from localStorage
@@ -91,17 +111,18 @@ function ProofCreator() {
                 throw new Error('Invalid or expired nonce');
               }
             } catch (err) {
-              console.error('Error handling Discourse SSO:', err);
+              console.error('[CLIENT] ❌ Error handling Discourse SSO:', err);
               setError(err.response?.data?.error || err.message || 'Failed to complete SSO process');
               setStatus('error');
             }
           } else {
+            console.error('[CLIENT] ❌ No SSO nonce found');
             setError('No SSO nonce found');
             setStatus('error');
           }
         }
       } catch (err) {
-        console.error('Error in proof process:', err);
+        console.error('[CLIENT] ❌ Error in proof process:', err);
         setError(err.message);
         setStatus('error');
       }
@@ -164,7 +185,7 @@ function ProofCreator() {
         <Box
           component="img"
           src="/logo/logo.svg"
-          alt="Zauth Logo"
+          alt="ZuitzAnon Logo"
           sx={{
             width: '100px',
             height: '100px',
@@ -186,7 +207,7 @@ function ProofCreator() {
             textShadow: '0 2px 10px rgba(0,0,0,0.2)',
           }}
         >
-          Creating Zauth Proof
+          Creating ZuitzAnon Proof
         </Typography>
 
         {userEmail && (

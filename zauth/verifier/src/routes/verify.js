@@ -5,15 +5,15 @@ const { sessionManager } = require('../session');
 
 router.post('/verify-jwt-proof', async (req, res) => {
   try {
-    console.log('Received request body:', JSON.stringify(req.body, null, 2));
+    console.log('\n=== [SERVER] Proof Verification Request ===');
+    console.log('[SERVER] Received proof verification request');
 
     const { proofVerify, publicInputs } = req.body;
 
     if (!proofVerify || !publicInputs) {
-      console.error('Missing required fields:', {
+      console.error('[SERVER] ❌ Missing required fields:', {
         hasProof: !!proofVerify,
-        hasPublicInputs: !!publicInputs,
-        body: req.body
+        hasPublicInputs: !!publicInputs
       });
       return res.status(400).json({
         error: 'Bad Request',
@@ -21,19 +21,36 @@ router.post('/verify-jwt-proof', async (req, res) => {
       });
     }
 
+    console.log('[SERVER] ✓ Proof and public inputs received');
+    console.log('[SERVER] Public inputs:', publicInputs);
+    console.log('[SERVER] Proof data:', {
+      proofLength: proofVerify.length,
+      proofData: proofVerify
+    });
+
     // Ensure proof is an array
     const proofArray = Array.isArray(proofVerify) ? proofVerify : JSON.parse(proofVerify);
     const publicInputsArray = Array.isArray(publicInputs) ? publicInputs : JSON.parse(publicInputs);
 
+    console.log('[SERVER] Starting proof verification...');
+    console.log('[SERVER] Parsed proof:', {
+      proofLength: proofArray.length,
+      proofData: proofArray
+    });
+    console.log('[SERVER] Parsed public inputs:', publicInputsArray);
+    
     const verified = await circuitManager.verifyProof(proofArray, publicInputsArray);
     
     if (!verified) {
-      console.error('Proof verification failed');
+      console.error('[SERVER] ❌ Proof verification failed');
       return res.status(400).json({
         error: 'Verification failed',
         message: 'Invalid ZK proof'
       });
     }
+
+    console.log('[SERVER] ✓ Proof verified successfully!');
+    console.log('[SERVER] Creating session...');
 
     // Create a new session after successful verification
     const session = sessionManager.createSession({
@@ -41,10 +58,14 @@ router.post('/verify-jwt-proof', async (req, res) => {
       // Add any other user data you want to store in the session
     });
 
-    console.log('Created session:', session);
+    console.log('[SERVER] ✓ Session created successfully');
+    console.log('[SERVER] Session details:', {
+      token: session.sessionToken,
+      expiresAt: new Date(session.expiresAt).toISOString()
+    });
 
     res.status(200).json({
-      message: 'Zauth proof verified successfully!',
+      message: 'ZuitzAnon proof verified successfully!',
       verified: true,
       session: {
         token: session.sessionToken,
@@ -53,7 +74,7 @@ router.post('/verify-jwt-proof', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error during proof verification:', err);
+    console.error('[SERVER] ❌ Error during proof verification:', err);
     return res.status(500).json({
       error: 'Internal server error',
       message: err.message,

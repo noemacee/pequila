@@ -6,24 +6,40 @@ function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasStoredNonce, setHasStoredNonce] = useState(false);
 
   useEffect(() => {
     const nonce = searchParams.get('nonce');
-    console.log('Login component - Current URL:', window.location.href);
-    console.log('Login component - All URL parameters:', Object.fromEntries(searchParams.entries()));
-    console.log('Login component - Nonce from URL:', nonce);
+    
+    // Only process if we have a nonce and haven't stored it yet
+    if (nonce && !isProcessing && !hasStoredNonce) {
+      console.log('[CLIENT] Processing SSO request with nonce:', nonce);
+      
+      // Check if nonce is already stored
+      const existingNonce = localStorage.getItem('discourse_nonce');
+      if (existingNonce === nonce) {
+        console.log('[CLIENT] Nonce already stored:', nonce);
+        setHasStoredNonce(true);
+        return;
+      }
 
-    if (nonce && !isProcessing) {
-      console.log('Login component - Storing nonce in localStorage:', nonce);
+      // Store the new nonce
       localStorage.setItem('discourse_nonce', nonce);
-      // Verify storage
       const storedNonce = localStorage.getItem('discourse_nonce');
-      console.log('Login component - Verified stored nonce:', storedNonce);
+      
+      if (storedNonce === nonce) {
+        console.log('[CLIENT] ✓ Nonce stored successfully:', nonce);
+        setHasStoredNonce(true);
+      } else {
+        console.error('[CLIENT] ❌ Failed to store nonce');
+      }
+      
       setIsProcessing(true);
     }
-  }, [searchParams, isProcessing]);
+  }, [searchParams, isProcessing, hasStoredNonce]);
 
   const handleGoogleLogin = () => {
+    console.log('[CLIENT] Initiating Google login...');
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const redirectUri = import.meta.env.VITE_REDIRECT_URI;
     const scope = 'openid email profile';
@@ -37,6 +53,7 @@ function Login() {
       `nonce=${nonce}&` +
       `prompt=select_account`;
 
+    console.log('[CLIENT] Redirecting to Google OAuth...');
     window.location.href = authUrl;
   };
 
@@ -91,7 +108,7 @@ function Login() {
             textShadow: '0 2px 10px rgba(0,0,0,0.2)',
           }}
         >
-          Zauth Login
+          ZuitzAnon Login
         </Typography>
 
         <Button
