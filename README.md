@@ -121,6 +121,10 @@ Join us in making private, unlinkable, verifiable identity as easy as "login wit
 ## Demo Video:
 
 
+https://github.com/user-attachments/assets/e59a72a8-e8e1-4f5e-ac69-ddde523151b4
+
+
+
 
 **Notes on testing by judges**: 
 - The lenght of the JWT is of max 910 data bytes. We must add dynamic max lenght of JWT according to user's email and JWT. As such, for now it only works for a subset of global JWT, of lenght less or equal to 910. 
