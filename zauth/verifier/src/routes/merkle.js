@@ -4,7 +4,7 @@ const { handleWhitelistMerkle, handleBlacklistMerkle } = require('../merkle-api'
 
 const router = express.Router();
 
-router.post('/whitelist_merkle', handleWhitelistMerkle);
-router.post('/blacklist_merkle', handleBlacklistMerkle);
+router.get('/whitelist_merkle', handleWhitelistMerkle);
+router.get('/blacklist_merkle', handleBlacklistMerkle);
 
 module.exports = router;

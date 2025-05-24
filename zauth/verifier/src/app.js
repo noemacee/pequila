@@ -8,7 +8,6 @@ const circuitManager = require('./circuit');
 const verifyRoutes = require('./routes/verify');
 const discourseRoutes = require('./routes/discourse');
 const merkleRoutes = require('./routes/merkle');
-const { handleWhitelistMerkle, handleBlacklistMerkle } = require('./merkle-api');
 
 const app = express();
 
