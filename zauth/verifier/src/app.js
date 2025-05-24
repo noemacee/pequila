@@ -7,6 +7,8 @@ const config = require('./config');
 const circuitManager = require('./circuit');
 const verifyRoutes = require('./routes/verify');
 const discourseRoutes = require('./routes/discourse');
+const merkleRoutes = require('./routes/merkle');
+const { handleWhitelistMerkle, handleBlacklistMerkle } = require('./merkle-api');
 
 const app = express();
 
@@ -19,9 +21,11 @@ app.use(cookieParser());
 app.use(bodyParser.json({ limit: config.bodyParserLimit }));
 app.use(bodyParser.urlencoded({ limit: config.bodyParserLimit, extended: true }));
 
+
 // API Routes
 app.use('/api/verify', verifyRoutes);
 app.use('/api/discourse', discourseRoutes);
+app.use('/api', merkleRoutes);
 
 // SSO route needs to be at root level
 app.use('/', discourseRoutes);
