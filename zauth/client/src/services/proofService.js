@@ -49,7 +49,7 @@ class ProofService {
     }
 
     try {
-      const maxSignedDataLength = 910;
+      const maxSignedDataLength = 1024;
       const circuitInputs = await generateInputs({
         jwt,
         pubkey,

@@ -20,7 +20,7 @@ Then we run your merkle-proof code over proof_nodes (the sibling hashes) and pro
 Finally you assert that the computed root equals the public merkle_root.
 */
 
-global MAX_EMAIL_LENGTH: u32 = 24;
+global MAX_EMAIL_LENGTH: u32 = 34;
 global MAX_DATA_LENGTH: u32 = 1024; // max length of signed data (headerb64 + "." + payloadb64)
 global MAX_NONCE_LENGTH: u32 = 32; // we are verifying `nonce` claim
 global M: u32 = 2;
@@ -190,7 +190,7 @@ fn test_merkle_membership() {
 #[test]
 fn test_merkle_membership_leaf_root_from_ext() {
     // Create test data for a simple Merkle tree
-    let expected_email: BoundedVec<u8, MAX_EMAIL_LENGTH> = BoundedVec::from_array("macenoe@gmail.com\0\0\0\0\0\0\0".as_bytes());
+    let expected_email: BoundedVec<u8, MAX_EMAIL_LENGTH> = BoundedVec::from_array("macenoe@gmail.com0000000".as_bytes());
     let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
     let leaf: Field = pedersen_hash(email_fields);
 
@@ -302,11 +302,11 @@ fn test_main() {
 
     // Create test data for a simple Merkle tree
     let leaf: Field = 0x2f992e519ecd7f4cbbaea10f1577afeba8b918c87a505f60393f25076ff737b3;
-    let indexes = 3; // Position in the tree
+    let indexes = 0; // Position in the tree
     // 2) build a dummy sibling path
-    let hash_path: [Field; TREE_DEPTH] = [0x00e559c5d2134d470ffdeddba4b46f718ddab7bc1e78c14926e1ac174d25216a, 0x0b3f875b7afcdf2f0a2e263d6488eb64e4162515d74826cae34867708dda2ce2];
+    let hash_path: [Field; TREE_DEPTH] = [0x064bba7a71df2b5e9185b5a54ac33dedc2a6f0bcd119577bafdc7e34d68d729d, 0x2457d15fcb7062785aa5d2a0eecfe0506082b3ace9b0a4dde601363839a2dff5];
     // 3) build tree and get the real root
-    let root: Field = 0x19491a5e8bd28ff4f63c10c21dc64febce6c3ec44145547b887274d79fb2b08f;
+    let root: Field = 0x017983d8bc1366b95d1c34fb0a1c64e5dc3bb051ac1159f92707e80859d0711c;
     main(
         data,
         base64_decode_offset,
