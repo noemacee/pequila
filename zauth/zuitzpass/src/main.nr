@@ -1,6 +1,7 @@
 use jwt::JWT;
-use std::hash::{self, poseidon2::Poseidon2::hash};
-use trees::merkle::{Calculator, MerkleTree};
+use std::{hash::{poseidon2::Poseidon2::hash, }, hash};
+use trees::{merkle::{Calculator, MerkleTree}};
+use indexed_merkle::{verifyExclusionProof, MAX_DEPTH};
 
 // I know a valid RS256 JWT whose email claim is in the approved merkle-set.
 /*
@@ -30,9 +31,28 @@ global LEAF_LIMBS: u32 = 8;
 
 // Merkle parameters:
 global TREE_DEPTH: u32 = 8; // e.g. a 2^8-leaf tree //256 participants max at Zuitzerland
+// Nullifier parameters:
+global NULLIFIER_TREE_DEPTH: u32 = MAX_DEPTH;
 
 // Constants for the PCD Merkle Tree
 global PCD_TREE_DEPTH: u32 = 10; // Allowing for more PCDs than participants
+
+struct MerkleParams {
+    root: Field,
+    siblings: [Field; TREE_DEPTH],
+    index: Field,
+}
+
+struct NullifierParams {
+    root: Field,
+    leafIdx: u32,
+    leafKey: u64,
+    leafNextIdx: u32,
+    leafNextKey: u64,
+    leafValue: Field,
+    siblings: [Field; NULLIFIER_TREE_DEPTH],
+    excludedKey: u64,
+}
 
 fn main(
     data: BoundedVec<u8, MAX_DATA_LENGTH>,
@@ -40,9 +60,8 @@ fn main(
     pubkey_modulus_limbs: pub [u128; 18],
     redc_params_limbs: [u128; 18],
     signature_limbs: [u128; 18],
-    merkle_root: pub Field,
-    proof_siblings: [Field; TREE_DEPTH], // sibling hashes
-    proof_index: Field, // leaf index in the tree
+    merkle_tree: MerkleParams,
+    nullififer_tree: NullifierParams,
 ) {
     let jwt = JWT::init(
         data,
@@ -64,11 +83,22 @@ fn main(
     let leaf: Field = hash(email_fields, LEAF_LIMBS);
     // 3) Verify the Merkle proof
     belongs_to_merkle_tree(
-        merkle_root,
+        merkle_tree.root,
         poseidon_hasher,
         leaf,
-        proof_index,
-        proof_siblings,
+        merkle_tree.index,
+        merkle_tree.siblings,
+    );
+    // 4) Verify person doens't belong to nullifier tree
+    verifyExclusionProof(
+        nullififer_tree.leafIdx,
+        nullififer_tree.leafKey,
+        nullififer_tree.leafNextIdx,
+        nullififer_tree.leafNextKey,
+        nullififer_tree.leafValue,
+        nullififer_tree.root,
+        nullififer_tree.siblings,
+        nullififer_tree.excludedKey
     );
 }
 
