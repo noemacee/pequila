@@ -5,5 +5,5 @@ authors = [""]
 compiler_version = ">=0.29.0"
 
 [dependencies]
-jwt = { tag = "v0.4.4", git = "https://github.com/zkemail/noir-jwt" }
 trees = { git = "https://github.com/privacy-scaling-explorations/zk-kit.noir", tag = "merkle-trees-v0.0.1", directory = "packages/merkle-trees" }
+zkemail = { tag = "v.1.0.0-beta.5", git = "https://github.com/zkemail/zkemail.nr", directory = "lib" }
