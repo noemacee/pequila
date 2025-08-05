@@ -2,7 +2,7 @@
 
 # Introduction
 
-**Zuitzerland** is a one-of-a-kind "pop-up village" experiment with strong decentralized-access (d/acc) vibes—think Zuzalu with a similar strong privacy focus. At this tiny scale, we've already achieved product–market fit: event organizers are clamoring for a self-hosted tool that lets attendees prove membership without exposing their identity while still being able to ban rule-breaking users.
+**Zuitzerland** is a one-of-a-kind "pop-up village" experiment with strong decentralized/defensive/democratic acceleration (d/acc) vibes—think Zuzalu with a similar strong privacy focus. At this tiny scale, we've already achieved product–market fit: event organizers are clamoring for a self-hosted tool that lets attendees prove membership without exposing their identity while still being able to ban rule-breaking users.
 
 ---
 
