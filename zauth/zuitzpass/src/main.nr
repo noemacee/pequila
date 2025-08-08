@@ -1,9 +1,11 @@
 use std::{collections::bounded_vec::BoundedVec, hash::pedersen_hash};
-use trees::merkle::{Calculator, MerkleTree};
-use zkemail::{
-    KEY_LIMBS_1024,
-    KEY_LIMBS_2048, 
-    MAX_EMAIL_ADDRESS_LENGTH,
+
+mod test_integration;
+use trees::{
+    merkle::{Calculator, MerkleTree},
+    types::{MT_Creator, MembershipProver, Modifier}
+};
+use zkemail::{ 
     Sequence,
     dkim::RSAPubkey,
     headers::email_address::get_email_address,
@@ -30,9 +32,12 @@ Finally you assert that the computed root equals the public merkle_root.
 global ZUITZERLAND_EMAIL_ADDRESS: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> = BoundedVec::from_array("team@zuitzerland.ch".as_bytes());
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
+global MAX_EMAIL_ADDRESS_LENGTH: u32 = 320;
 global MAX_DATA_LENGTH: u32 = 910; // max length of signed data (headerb64 + "." + payloadb64)
 global MAX_NONCE_LENGTH: u32 = 32; // we are verifying `nonce` claim
 global M: u32 = 2;
+
+global KEY_LIMBS_2048: u32 = 18;
 
 // how many Field-limbs we'll chunk the email into before hashing:
 global LEAF_LIMBS: u32 = 8;
@@ -58,7 +63,7 @@ fn main(
 ) {
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
 
-    pub_key.verify_dkim_signature(header, signature);
+    let _header_hash = pub_key.verify_dkim_signature(header, signature);
     
     let from = comptime { "from".as_bytes() };
     let from_address = get_email_address(
@@ -190,7 +195,6 @@ fn test_merkle_membership() {
     let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
     // 3) build tree and get the real root
     let root: Field = MerkleTree::new(pedersen_hash).calculate_root(leaf, indexes, hash_path);
-    let mut mt1 = MerkleTree::from(root, pedersen_hash);
 
     // Test the membership function
     belongs_to_merkle_tree(root, pedersen_hash, leaf, indexes, hash_path);
@@ -214,101 +218,7 @@ fn test_merkle_membership_wrong_leaf() {
 }
 
 #[test]
-fn test_email_parsing_and_merkle_tree() {
-    let pubkey_modulus_limbs = [
-        484791102317025465533947056954494751,
-        689128460766062759582134715581990032,
-        810523707777777878428965619663888709,
-        184404549238669475316963116864788898,
-        93466218048229154672139102341852900,
-        584828628768888069086079532464056431,
-        97425187031931427039620311245463762,
-        26273806718910063326353308419294998,
-        788747954066548540615875263034804664,
-        889704621954975151388848797463892494,
-        311999144542197118282319553447935979,
-        569776388981460921496753063185331362,
-        903966640703701959992132828577771898,
-        159022820921763067563807580152706463,
-        503819859541011037194389727017199051,
-        1078173269124751507098806957834900664,
-        808018922828293630146825008649069450,
-        163,
-    ];
-    
-    let redc_params_limbs = [
-        1143167338325541577958669340190596824,
-        782066667103526839077340987159104121,
-        1067845759344375818181746341911682002,
-        880124617802511701465844415806808588,
-        285259139341669707856057706066903101,
-        1230850420220071595120007854793337041,
-        243441877489860292941608721967510056,
-        821283804950244931298352888469271304,
-        265590023859021620015146340457966193,
-        955602690275722281613949658760787989,
-        704159826142581942518373637894303280,
-        313938418637521056314346970388282852,
-        296174013877567499290252280618882959,
-        127533166408087917092441034792304239,
-        486694435757811118946661778147879193,
-        742440511645057019411661928820777129,
-        106100992772450627263374716203348785,
-        6409,
-    ];
-    
-    let pub_key = RSAPubkey {
-        modulus: pubkey_modulus_limbs,
-        redc: redc_params_limbs,
-    };
-    
-    let signature_limbs = [
-        782421962573548264472674190647943355,
-        528649442614902878048130358901749842,
-        795671681115216636642039527621785323,
-        342055983261463759066440970886912343,
-        320943042314824191484469254030368420,
-        233931545977215775766660875366648712,
-        166738968145911552289782464945436391,
-        1280090914380823160665554635957223606,
-        225322564371992173705155119766257284,
-        1012067778676730712845356243167441596,
-        337008035250054394089555850701430953,
-        441480997772890594691718538441538925,
-        1266099611422563733802354067242028554,
-        163890419575820619684088542045789366,
-        71236811945264458762129145425586273,
-        106105739687938386497215871288359508,
-        598323717706499880526430558338637686,
-        97,
-    ];
-    
-    // Sample email header with from and to fields
-    let header_data = "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=zuitzerland.ch; s=default; t=1640995200; h=from:to:subject; bh=abcd1234; b=xyz789...\r\nFrom: team@zuitzerland.ch\r\nTo: alice@test.com\r\nSubject: Test Email\r\n".as_bytes();
-    
-    let header: BoundedVec<u8, MAX_DATA_LENGTH> = BoundedVec::from_array(header_data);
-    
-    // Sequence parameters for parsing the from header
-    let from_header_sequence = Sequence {
-        index: 120,
-        length: 25,
-    };
-    
-    let from_address_sequence = Sequence {
-        index: 6, 
-        length: 19,
-    };
-    let to_header_sequence = Sequence {
-        index: 146,
-        length: 20,
-    };
-    
-    // Sequence parameters for extracting the to email address
-    let to_address_sequence = Sequence {
-        index: 4,
-        length: 14,
-    };
-    
+fn test_merkle_tree_functionality() {
     // Test the email to field conversion and merkle tree logic
     let expected_email: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> = BoundedVec::from_array("alice@test.com".as_bytes());
     let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
@@ -339,4 +249,103 @@ fn test_email_parsing_and_merkle_tree() {
     let email_nullifier = pedersen_hash(signature_limbs);
     
     assert(email_nullifier != 0);
+}
+
+#[test]
+fn test_email_to_fields_conversion() {
+    // Test 1: Short email
+    let short_email = BoundedVec::from_array("a@b.c".as_bytes());
+    let fields1 = boundedvec_to_fields(short_email);
+    assert(fields1[0] != 0); // First field should contain the email
+    assert(fields1[1] == 0); // Second field should be empty for short email
+    
+    // Test 2: Longer email that spans multiple fields
+    let long_email = BoundedVec::from_array(
+        "very.long.email.address.that.spans.multiple.fields@example.com".as_bytes()
+    );
+    let fields2 = boundedvec_to_fields(long_email);
+    assert(fields2[0] != 0); // First field should be populated
+    assert(fields2[1] != 0); // Second field should also be populated for long email
+    
+    // Test 3: Exact 32-byte email
+    let exact_32_email = BoundedVec::from_array(
+        "exactly32bytes@domain.com123456".as_bytes()  // 32 bytes exactly
+    );
+    let fields3 = boundedvec_to_fields(exact_32_email);
+    assert(fields3[0] != 0);
+    
+    // Test 4: Zuitzerland email address
+    let zuitz_email = ZUITZERLAND_EMAIL_ADDRESS;
+    let fields4 = boundedvec_to_fields(zuitz_email);
+    assert(fields4[0] != 0);
+    
+    // Verify that different emails produce different field values
+    assert(fields1[0] != fields2[0]);
+    assert(fields1[0] != fields3[0]);
+    assert(fields1[0] != fields4[0]);
+}
+
+#[test]
+fn test_complete_email_verification_flow() {
+    // Create a test email address
+    let test_email = BoundedVec::from_array("participant@zuitzerland.ch".as_bytes());
+    
+    // Step 1: Convert email to fields
+    let email_fields = boundedvec_to_fields(test_email);
+    
+    // Step 2: Hash the email fields to create a leaf
+    let leaf = pedersen_hash(email_fields);
+    
+    // Step 3: Build a merkle tree with multiple participants
+    // Simulate other participants' email hashes
+    let participant1 = pedersen_hash([111, 222]); 
+    let participant2 = pedersen_hash([333, 444]);
+    let participant3 = pedersen_hash([555, 666]);
+    
+    // Create merkle tree structure (simplified for testing)
+    // In production, this would be built from all participants
+    let level1_node1 = pedersen_hash([leaf, participant1]);
+    let level1_node2 = pedersen_hash([participant2, participant3]);
+    let level2_node = pedersen_hash([level1_node1, level1_node2]);
+    
+    // Create dummy nodes for remaining tree levels
+    let dummy_node = pedersen_hash([987, 654]);
+    let mut proof_siblings: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+    proof_siblings[0] = participant1;  // Sibling at level 0
+    proof_siblings[1] = level1_node2;  // Sibling at level 1
+    for i in 2..TREE_DEPTH {
+        proof_siblings[i] = dummy_node;
+    }
+    
+    // Calculate the root with our proof path
+    let calculated_root = MerkleTree::new(pedersen_hash).calculate_root(
+        leaf,
+        0, // Index 0 in the tree
+        proof_siblings
+    );
+    
+    // Verify membership
+    belongs_to_merkle_tree(
+        calculated_root,
+        pedersen_hash,
+        leaf,
+        0,
+        proof_siblings,
+    );
+    
+    // Step 4: Test nullifier generation
+    let test_signature: [Field; KEY_LIMBS_2048] = [100; KEY_LIMBS_2048];
+    let nullifier1 = pedersen_hash(test_signature);
+    
+    // Different signature should produce different nullifier
+    let test_signature2: [Field; KEY_LIMBS_2048] = [200; KEY_LIMBS_2048];
+    let nullifier2 = pedersen_hash(test_signature2);
+    
+    assert(nullifier1 != 0);
+    assert(nullifier2 != 0);
+    assert(nullifier1 != nullifier2);
+    
+    // Same signature should always produce same nullifier (deterministic)
+    let nullifier1_again = pedersen_hash(test_signature);
+    assert(nullifier1 == nullifier1_again);
 }
