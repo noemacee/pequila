@@ -1,7 +1,11 @@
 import { UltraHonkBackend } from '@aztec/bb.js';
 import { Noir } from '@noir-lang/noir_js';
-import { generateInputs } from '../utils/jwtProof';
-import { jwtDecode } from 'jwt-decode';
+import { 
+  generateInputs, 
+  extractEmailMetadata, 
+  verifyEmailDKIM,
+  prepareEmailForCircuit 
+} from '../utils/jwtProof';
 import axios from 'axios';
 
 class ProofService {
@@ -28,35 +32,31 @@ class ProofService {
     }
   }
 
-  async fetchGooglePubkey(jwt) {
-    try {
-      const header = JSON.parse(atob(jwt.split('.')[0].replace(/-/g, '+').replace(/_/g, '/')));
-      const response = await fetch('https://www.googleapis.com/oauth2/v3/certs');
-      const jwks = await response.json();
-      const key = jwks.keys.find(k => k.kid === header.kid);
-      
-      if (!key) throw new Error('Google public key not found for JWT');
-      return key;
-    } catch (error) {
-      console.error('Error fetching Google public key:', error);
-      throw new Error('Failed to fetch Google public key: ' + error.message);
-    }
-  }
-
-  async generateProof(jwt, pubkey, merkleRoot, proofSiblings, proofIndex) {
+  /**
+   * Generate zkEmail proof from raw email content
+   */
+  async generateProof(emailRaw, merkleRoot, proofSiblings, proofIndex, options = {}) {
     if (!this.noir || !this.backend) {
       throw new Error('Circuit not initialized');
     }
 
     try {
-      const maxSignedDataLength = 910;
+      const zkEmailOptions = {
+        maxHeadersLength: options.maxHeadersLength || 1408,
+        maxBodyLength: options.maxBodyLength || 1280,
+        ignoreBodyHashCheck: options.ignoreBodyHashCheck || false,
+        shaPrecomputeSelector: options.shaPrecomputeSelector,
+        extractFrom: options.extractFrom !== false,
+        extractTo: options.extractTo !== false,
+        ...options
+      };
+
       const circuitInputs = await generateInputs({
-        jwt,
-        pubkey,
-        maxSignedDataLength,
+        emailRaw,
         merkle_root: merkleRoot,
         proof_siblings: proofSiblings,
         proof_index: proofIndex,
+        ...zkEmailOptions
       });
 
       const { witness } = await this.noir.execute(circuitInputs);
@@ -67,14 +67,47 @@ class ProofService {
         publicInputs: proof.publicInputs
       };
     } catch (error) {
-      console.error('Error generating proof:', error);
-      throw new Error('Failed to generate proof: ' + error.message);
+      console.error('Error generating zkEmail proof:', error);
+      throw new Error('Failed to generate zkEmail proof: ' + error.message);
     }
   }
 
+  /**
+   * Generate zkEmail proof with full preparation and metadata
+   */
+  async generateEmailProof(emailRaw, merkleRoot, proofSiblings, proofIndex, options = {}) {
+    try {
+      const prepared = await prepareEmailForCircuit(emailRaw, {
+        merkle_root: merkleRoot,
+        proof_siblings: proofSiblings,
+        proof_index: proofIndex,
+        ...options
+      });
+      
+      const { witness } = await this.noir.execute(prepared.inputs);
+      const proof = await this.backend.generateProof(witness);
+
+      return {
+        proof: {
+          proofVerify: proof.proof,
+          publicInputs: proof.publicInputs
+        },
+        metadata: prepared.metadata,
+        verified: true
+      };
+    } catch (error) {
+      console.error('Error in generateEmailProof:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify zkEmail proof
+   */
   async verifyProof(proofVerify, publicInputs) {
     try {
-      const response = await axios.post(`${this.apiBaseUrl}/api/verify/verify-jwt-proof`, {
+      // verify endpoint 
+      const response = await axios.post(`${this.apiBaseUrl}/api/verify/verify-zkemail-proof`, {
         proofVerify: JSON.stringify(Array.from(proofVerify)),
         publicInputs: JSON.stringify(publicInputs, null, 2)
       });
@@ -84,18 +117,75 @@ class ProofService {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error verifying proof:', error);
+      console.error('Error verifying zkEmail proof:', error);
       throw new Error(error.response?.data?.message || error.message);
     }
   }
 
-  getUserEmail(jwt) {
+  /**
+   * Extract user email from raw email content
+   */
+  getUserEmail(emailRaw) {
     try {
-      const decoded = jwtDecode(jwt);
-      return decoded.email;
+      const metadata = extractEmailMetadata(emailRaw);
+      return metadata.from;
     } catch (error) {
-      console.error('Error decoding JWT:', error);
-      throw new Error('Failed to decode JWT: ' + error.message);
+      console.error('Error extracting email:', error);
+      throw new Error('Failed to extract email: ' + error.message);
+    }
+  }
+
+  /**
+   * Get full email metadata
+   */
+  getEmailMetadata(emailRaw) {
+    try {
+      return extractEmailMetadata(emailRaw);
+    } catch (error) {
+      console.error('Error extracting email metadata:', error);
+      throw new Error('Failed to extract email metadata: ' + error.message);
+    }
+  }
+
+  /**
+   * Verify DKIM signature of an email
+   */
+  async verifyEmailDKIM(emailRaw) {
+    try {
+      const result = await verifyEmailDKIM(emailRaw);
+      if (!result.verified) {
+        throw new Error('Email DKIM verification failed');
+      }
+      return result;
+    } catch (error) {
+      console.error('Error verifying email DKIM:', error);
+      throw new Error('Failed to verify email DKIM: ' + error.message);
+    }
+  }
+
+  /**
+   * Check if an email is valid for proof generation
+   */
+  async isValidEmail(emailRaw) {
+    try {
+      const dkimResult = await verifyEmailDKIM(emailRaw);
+      const metadata = extractEmailMetadata(emailRaw);
+      
+      return {
+        isValid: dkimResult.verified && metadata.from !== null,
+        dkimVerified: dkimResult.verified,
+        hasFromAddress: metadata.from !== null,
+        metadata,
+        dkimInfo: {
+          signingDomain: dkimResult.signingDomain,
+          selector: dkimResult.selector
+        }
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        error: error.message
+      };
     }
   }
 }
