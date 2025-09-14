@@ -5,7 +5,7 @@ import {
   extractEmailMetadata, 
   verifyEmailDKIM,
   prepareEmailForCircuit 
-} from '../utils/jwtProof';
+} from '../utils/zkemailProof';
 import axios from 'axios';
 
 class ProofService {

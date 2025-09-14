@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, CircularProgress } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert } from '@mui/material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import proofConfig from '../config/proofConfig.json';
 import { proofService } from '../services/proofService';
-import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 
 function ProofCreator() {
@@ -15,7 +14,7 @@ function ProofCreator() {
   console.log('[CLIENT] ProofCreator - Retrieved nonce from localStorage:', nonce);
   console.log('[CLIENT] ProofCreator - All URL parameters:', Object.fromEntries(searchParams.entries()));
   
-  const jwt = localStorage.getItem('idToken');
+  const emailContent = localStorage.getItem('email_content');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('initializing');
   const [userEmail, setUserEmail] = useState('');
@@ -41,29 +40,36 @@ function ProofCreator() {
 
   useEffect(() => {
     const processProof = async () => {
-      if (status !== 'ready' || !jwt || hasRedirected) return;
+      if (status !== 'ready' || !emailContent || hasRedirected) return;
 
       try {
-        console.log('[CLIENT] Starting proof generation process...');
+        console.log('[CLIENT] Starting zkEmail proof generation process...');
         setStatus('generating');
         
-        console.log('[CLIENT] Fetching Google public key...');
-        const pubkey = await proofService.fetchGooglePubkey(jwt);
-        console.log('[CLIENT] ✓ Google public key fetched');
+        console.log('[CLIENT] Verifying DKIM signature...');
+        const dkimResult = await proofService.verifyEmailDKIM(emailContent);
+        if (!dkimResult.verified) {
+          throw new Error('Email DKIM verification failed');
+        }
+        console.log('[CLIENT] ✓ DKIM signature verified');
         
-        const email = proofService.getUserEmail(jwt);
+        const emailMetadata = proofService.getEmailMetadata(emailContent);
+        const email = emailMetadata.from;
         setUserEmail(email);
         console.log('[CLIENT] User email:', email);
 
-        console.log('[CLIENT] Generating ZK proof...');
+        console.log('[CLIENT] Generating zkEmail proof...');
         const { proofVerify, publicInputs } = await proofService.generateProof(
-          jwt,
-          pubkey,
+          emailContent,
           proofConfig.merkle_root,
           proofConfig.proof_siblings,
-          proofConfig.proof_index
+          proofConfig.proof_index,
+          {
+            extractFrom: true,
+            extractTo: true
+          }
         );
-        console.log('[CLIENT] ✓ ZK proof generated successfully');
+        console.log('[CLIENT] ✓ zkEmail proof generated successfully');
         console.log('[CLIENT] Generated proof:', {
           proofLength: proofVerify.length,
           proofData: proofVerify,
@@ -129,7 +135,7 @@ function ProofCreator() {
     };
 
     processProof();
-  }, [status, jwt, nonce, hasRedirected]);
+  }, [status, emailContent, nonce, hasRedirected]);
 
   const getStatusMessage = () => {
     switch (status) {
@@ -138,7 +144,7 @@ function ProofCreator() {
       case 'ready':
         return 'Ready to generate proof...';
       case 'generating':
-        return 'Generating proof for your JWT...';
+        return 'Generating zkEmail proof...';
       case 'verifying':
         return 'Verifying proof with the server...';
       case 'complete':

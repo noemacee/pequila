@@ -1,12 +1,16 @@
-import {
-  verifyDKIMSignature,
-  sha256Pad,
-  Uint8ArrayToCharArray,
-  generatePartialSHA,
-  findIndexInUint8Array,
-} from '@zk-email/helpers';
-import { u8ToU32, getHeaderSequence, getAddressHeaderSequence } from '@zk-email/js/src/utils';
-import * as NoirBignum from '@mach-34/noir-bignum-paramgen';
+// Lazy load these modules to avoid browser issues
+let zkEmailHelpers = null;
+let zkEmailNr = null;
+let NoirBignum = null;
+
+async function loadDependencies() {
+  if (!zkEmailHelpers) {
+    zkEmailHelpers = await import('@zk-email/helpers');
+    zkEmailNr = await import('@zk-email/zkemail-nr');
+    NoirBignum = await import('@mach-34/noir-bignum-paramgen');
+  }
+  return { zkEmailHelpers, zkEmailNr, NoirBignum };
+}
 
 const DEFAULT_MAX_HEADERS_LENGTH = 1408;
 const DEFAULT_MAX_BODY_LENGTH = 1280;   
@@ -27,6 +31,9 @@ export async function generateInputs({
   extractTo = false,
 }) {
   try {
+    const { zkEmailHelpers, zkEmailNr, NoirBignum: NB } = await loadDependencies();
+    const { verifyDKIMSignature, sha256Pad, Uint8ArrayToCharArray, generatePartialSHA, findIndexInUint8Array } = zkEmailHelpers;
+    const { u8ToU32, getHeaderSequence, getAddressHeaderSequence } = zkEmailNr;
     const emailBuffer = typeof emailRaw === 'string' 
       ? Buffer.from(emailRaw) 
       : emailRaw;
@@ -41,9 +48,9 @@ export async function generateInputs({
 
     const [headersPadded] = sha256Pad(headers, maxHeadersLength);
 
-    const pubkeyModulusLimbs = NoirBignum.bnToLimbStrArray(publicKey, modulusLength);
-    const pubkeyRedcLimbs = NoirBignum.bnToRedcLimbStrArray(publicKey, modulusLength);
-    const signatureLimbs = NoirBignum.bnToLimbStrArray(signature, modulusLength);
+    const pubkeyModulusLimbs = NB.bnToLimbStrArray(publicKey, modulusLength);
+    const pubkeyRedcLimbs = NB.bnToRedcLimbStrArray(publicKey, modulusLength);
+    const signatureLimbs = NB.bnToLimbStrArray(signature, modulusLength);
 
     const dkimHeaderSequence = getHeaderSequence(headers, "dkim-signature");
 
@@ -174,6 +181,8 @@ export function extractEmailMetadata(emailRaw) {
  */
 export async function verifyEmailDKIM(emailRaw) {
   try {
+    const { zkEmailHelpers } = await loadDependencies();
+    const { verifyDKIMSignature } = zkEmailHelpers;
     const emailBuffer = typeof emailRaw === 'string' 
       ? Buffer.from(emailRaw) 
       : emailRaw;

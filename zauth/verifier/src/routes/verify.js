@@ -3,10 +3,10 @@ const router = express.Router();
 const circuitManager = require('../circuit');
 const { sessionManager } = require('../session');
 
-router.post('/verify-jwt-proof', async (req, res) => {
+router.post('/verify-zkemail-proof', async (req, res) => {
   try {
-    console.log('\n=== [SERVER] Proof Verification Request ===');
-    console.log('[SERVER] Received proof verification request');
+    console.log('\n=== [SERVER] zkEmail Proof Verification Request ===');
+    console.log('[SERVER] Received zkEmail proof verification request');
 
     const { proofVerify, publicInputs } = req.body;
 
@@ -21,7 +21,7 @@ router.post('/verify-jwt-proof', async (req, res) => {
       });
     }
 
-    console.log('[SERVER] ✓ Proof and public inputs received');
+    console.log('[SERVER] ✓ zkEmail proof and public inputs received');
     console.log('[SERVER] Public inputs:', publicInputs);
     console.log('[SERVER] Proof data:', {
       proofLength: proofVerify.length,
@@ -32,7 +32,7 @@ router.post('/verify-jwt-proof', async (req, res) => {
     const proofArray = Array.isArray(proofVerify) ? proofVerify : JSON.parse(proofVerify);
     const publicInputsArray = Array.isArray(publicInputs) ? publicInputs : JSON.parse(publicInputs);
 
-    console.log('[SERVER] Starting proof verification...');
+    console.log('[SERVER] Starting zkEmail proof verification...');
     console.log('[SERVER] Parsed proof:', {
       proofLength: proofArray.length,
       proofData: proofArray
@@ -42,19 +42,20 @@ router.post('/verify-jwt-proof', async (req, res) => {
     const verified = await circuitManager.verifyProof(proofArray, publicInputsArray);
     
     if (!verified) {
-      console.error('[SERVER] ❌ Proof verification failed');
+      console.error('[SERVER] ❌ zkEmail proof verification failed');
       return res.status(400).json({
         error: 'Verification failed',
-        message: 'Invalid ZK proof'
+        message: 'Invalid zkEmail proof'
       });
     }
 
-    console.log('[SERVER] ✓ Proof verified successfully!');
+    console.log('[SERVER] ✓ zkEmail proof verified successfully!');
     console.log('[SERVER] Creating session...');
 
     // Create a new session after successful verification
     const session = sessionManager.createSession({
       verifiedAt: Date.now(),
+      verificationMethod: 'zkemail',
       // Add any other user data you want to store in the session
     });
 
@@ -65,7 +66,7 @@ router.post('/verify-jwt-proof', async (req, res) => {
     });
 
     res.status(200).json({
-      message: 'ZuitzAnon proof verified successfully!',
+      message: 'zkEmail proof verified successfully!',
       verified: true,
       session: {
         token: session.sessionToken,
@@ -74,7 +75,7 @@ router.post('/verify-jwt-proof', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[SERVER] ❌ Error during proof verification:', err);
+    console.error('[SERVER] ❌ Error during zkEmail proof verification:', err);
     return res.status(500).json({
       error: 'Internal server error',
       message: err.message,
